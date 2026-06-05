@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  redis_sec:
+    image: redis:7.2-alpine
+    container_name: redis
+    command:  > 
+      redis-server  
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru 
+      --save "" 
+      --appendonly no 
+      --timeout 0 
+      --tcp-keepalive 60 
+    # --appendonly yes # 开启AOF持久化，防止内存特征因重启丢失
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sec_agent_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+
+  web_gateway:
+    image: security_gateway_api:lastest
+    build: .
+    container_name: security_gateway_api
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DEBUG=False
+    depends_on:
+      redis_sec:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    networks:
+      - sec_agent_net
+
+
+  celery_worker:
+    image: security_celery_worker:lastest
+    build: .
+    container_name: security_celery_worker
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1   # 注意主机名是 redis，不是 localhost
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      redis_sec:
+        condition: service_healthy
+      ollama_llm:
+        condition: service_started
+    # 启动分布式线程 Worker 监听任务
+    command: celery -A app.worker:celery_app worker --loglevel=info -P threads --concurrency=4
+    volumes:
+      - audit_logs_vol:/app/logs # 持久化 WORM 归一化安全审计日志
+    networks:
+      - sec_agent_net
+
+  ----------------------------------------------------
+  本地大模型推理引擎 (Ollama Container)(example)
+  ----------------------------------------------------
+  ollama_llm:
+    image: ollama/ollama:latest
+    container_name: security_ollama_engine
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama # 关键：持久化下载的model，避免重启重拉
+    networks:
+      - sec_agent_net
+  #   如果您的宿主机有 NVIDIA 显卡，请取消下方 5 行注释，可获得 20 倍以上的推理提速
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+
+networks:
+  sec_agent_net:
+    name: sec_agent_net
+    driver: bridge
+
+volumes:
+  redis_data:
+  ollama_models:
+  audit_logs_vol:
