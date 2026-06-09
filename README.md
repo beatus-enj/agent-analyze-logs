@@ -48,3 +48,14 @@ docker exec -it security_ollama_engine ollama run qwen2.5-7b-instruct
 ```bash
 python ./tests/test_agent_analyze_logs.py 
 ```
+4. celery侧可以看到如下结果
+```text
+[2026-06-09 08:36:06,280: WARNING/MainProcess] ---AUTOMATED EVALUATION (LLM-AS-A-JUDGE)---
+[2026-06-09 08:36:06,280: WARNING/MainProcess]   [Judge 审计结果] 🎉 置信契约对齐完全通过。
+[2026-06-09 08:36:06,280: WARNING/MainProcess] ---ROUTING DECISION: SCORE VALIDATED -> EXIT---
+[2026-06-09 08:36:06,282: INFO/MainProcess] Task tasks.execute_threat_hunt_pipeline[30dd198c-791e-42a0-baf9-16cff30dc427] succeeded in 97.61861640698044s: {'threat_level': 'CRITICAL', 'attack_justification': '当前异常指标显示账号 \'alice\' 在源IP \'192.168.10.5\' 的窗口内频繁登录失败（3次），但无合规策略拦截记 
+录。此外，历史关联独立IP数量为1，与暴力破解及权限纵向突破（Credential Stuffing）相似案例匹配度高。该案例历史实战技术特征包括短时间内密集登录失败，变换IP登录
+成功后立即进行高危破坏性越权操作。已验证阻断剧本模版为 [\'iam:suspend_user --username {user}\', \'waf:block_ip --ip {ip} --duration 86400\']。因此，建议采取
+紧急措施，包括暂停用户账户和封锁IP地址86400秒。', 'mitre_attack_technique_ids': ['T1110', 'T1078'], 'confidence_score': 1.0, 'is_automated_block_recommended': True, 'remediation_playbook_commands': ['iam:suspend_user --username alice', 'waf:block_ip --ip 192.168.10.5 --duration 86400']}
+
+```
