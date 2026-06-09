@@ -41,13 +41,18 @@ def run_integration_test():
     print(" 等待分布式 Worker 执行 RAG 矩阵比对与 AI 结构化判定（每2秒轮询一次）...")
     print("-"*50)
     
+
     # 轮询获取异步处理报告
-    for _ in range(10):
-        time.sleep(2)
+    poll_interval = 2          # 每次轮询间隔（秒），可根据后端响应速度调整
+    max_interval = 20
+    max_wait_time = 300        # 最大等待时间（秒），与原来 10 * 30 = 300 秒保持一致
+    start_time = time.time()
+
+    while time.time() - start_time < max_wait_time:
         try:
             status_res = requests.get(status_url + last_task_id, timeout=5).json()
             print(f" 当前分布式任务状态: [{status_res['status']}]")
-            
+
             if status_res["status"] == "SUCCESS":
                 report = status_res["report_output"]
                 print("\n" + "🎉"*15 + "【AI分布式研判大获成功 - 强类型校验通过报告清单】" + "🎉"*15)
@@ -59,12 +64,24 @@ def run_integration_test():
                 for cmd in report['remediation_playbook_commands']:
                     print(f"   👉 {cmd}")
                 print("="*85)
-                break
+                break   # 成功拿到结果，退出轮询
+            else:
+                # 状态不是 SUCCESS（可能是 PENDING, STARTED, RETRY 等），等待后继续轮询
+                time.sleep(poll_interval)
+                poll_interval = min(poll_interval * 5, max_interval)
+
+        except requests.exceptions.RequestException as e:
+            print(f"轮询发生网络异常: {e}")
+            break
+        except KeyError as e:
+            print(f"轮询返回数据格式异常，缺少关键字段: {e}")
+            break
         except Exception as e:
-            print(f"轮询发生异常: {e}")
+            print(f"轮询发生未预期异常: {e}")
             break
     else:
-        print("❌ 轮询超时，请确认 Celery Worker 是否正在健康运行。")
+        # while 循环正常结束（即超时未成功）
+        print("❌ 轮询超时（等待超过 {} 秒），请确认 Celery Worker 是否正在健康运行。".format(max_wait_time))
 
 if __name__ == "__main__":
     run_integration_test()

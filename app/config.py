@@ -18,7 +18,7 @@ class AppConfig(BaseSettings):
     # 本地大模型配置 (Ollama / vLLM)
     # LOCAL_LLM_URL: str = "http://localhost:11434/api/chat"
     # LOCAL_LLM_MODEL: str = "qwen2.5:7b-instruct"
-    LOCAL_LLM_URL: str = "http://ollama_llm:8080/v1"
+    LOCAL_LLM_URL: str = "http://ollama_llm:8080/v1/chat/completions"
     LOCAL_LLM_MODEL: str = "Qwen2.5-3B-Instruct-Q4_K_M"
     
     # 核心滑动窗口安全控制 (分钟)
